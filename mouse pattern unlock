@@ -1,0 +1,59 @@
+from pynput import mouse
+import math
+import time
+
+# === Define the pattern ===
+# e.g., ["right", "down", "right", "left"]
+password_pattern = ["right", "down", "right", "left"]
+tolerance = 20  # pixel movement threshold
+movement_log = []
+
+# Direction detection
+def get_direction(x1, y1, x2, y2):
+    dx = x2 - x1
+    dy = y2 - y1
+
+    if abs(dx) < tolerance and abs(dy) < tolerance:
+        return None
+
+    angle = math.degrees(math.atan2(dy, dx))
+
+    if -45 <= angle <= 45:
+        return "right"
+    elif 45 < angle <= 135:
+        return "down"
+    elif angle > 135 or angle < -135:
+        return "left"
+    elif -135 < angle < -45:
+        return "up"
+    return None
+
+# On mouse move
+positions = []
+def on_move(x, y):
+    positions.append((x, y))
+    if len(positions) > 1:
+        x1, y1 = positions[-2]
+        x2, y2 = positions[-1]
+        direction = get_direction(x1, y1, x2, y2)
+        if direction:
+            if len(movement_log) == 0 or direction != movement_log[-1]:
+                movement_log.append(direction)
+                print(f"Moved: {direction}")
+                if len(movement_log) >= len(password_pattern):
+                    check_pattern()
+
+# Check if user pattern matches password
+def check_pattern():
+    if movement_log[-len(password_pattern):] == password_pattern:
+        print("\n✅ UNLOCKED: Mouse pattern matched!")
+        listener.stop()
+    else:
+        print("❌ Pattern incorrect. Try again.")
+
+# Start mouse listener
+print("🖱️ Move your mouse in the secret pattern (e.g., → ↓ → ←)")
+print("Your pattern: ", password_pattern)
+
+with mouse.Listener(on_move=on_move) as listener:
+    listener.join()

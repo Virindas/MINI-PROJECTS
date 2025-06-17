@@ -1,0 +1,87 @@
+import cv2
+import time
+from plyer import notification
+from threading import Timer
+
+# Configuration
+BREAK_INTERVAL = 60 * 5       # every 5 minutes
+POSTURE_CHECK_INTERVAL = 10   # every 10 seconds
+TOLERANCE = 40                # allowed downward head movement (pixels)
+
+baseline_y = None  # to store calibrated good posture
+
+def show_notification(title, message):
+    notification.notify(
+        title=title,
+        message=message,
+        timeout=5  # seconds
+    )
+
+def remind_break():
+    show_notification("🌟 Time for a break!", "Blink your eyes, stretch your back, and relax!")
+    Timer(BREAK_INTERVAL, remind_break).start()
+
+def calibrate_posture(face_center_y):
+    global baseline_y
+    if baseline_y is None:
+        baseline_y = face_center_y
+        print(f"✅ Posture baseline set at Y = {baseline_y}")
+    return baseline_y
+
+def check_posture():
+    global baseline_y
+
+    face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + "haarcascade_frontalface_default.xml")
+    cap = cv2.VideoCapture(0)
+    cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
+    cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
+    cv2.namedWindow("Camera View", cv2.WINDOW_NORMAL)
+    time.sleep(1)
+
+    ret, frame = cap.read()
+    if not ret:
+        print("Failed to capture frame.")
+        cap.release()
+        return
+
+    gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+    faces = face_cascade.detectMultiScale(
+        gray,
+        scaleFactor=1.1,
+        minNeighbors=4,
+        minSize=(100, 100)
+    )
+
+    if len(faces) > 0:
+        (x, y, w, h) = faces[0]
+        face_center_y = y + h // 2
+        print(f"Detected face center Y = {face_center_y}")
+
+        calibrate_posture(face_center_y)
+
+        if baseline_y is not None:
+            if face_center_y - baseline_y > TOLERANCE:
+                show_notification("🧍‍♂️ Sit Up Straight!", "You're slouching. Adjust your posture.")
+                print("⚠️ Slouching detected!")
+            else:
+                print("✅ Good posture.")
+    else:
+        print("😶 No face detected.")
+
+    cv2.imshow("Camera View", frame)
+    cv2.waitKey(500)
+    cv2.destroyAllWindows()
+    cap.release()
+
+    Timer(POSTURE_CHECK_INTERVAL, check_posture).start()
+
+if __name__ == "__main__":
+    print("🚀 Screen Break Buddy Started (Reminds every 5 mins)...")
+    remind_break()
+    check_posture()
+
+    try:
+        while True:
+            time.sleep(1)
+    except KeyboardInterrupt:
+        print("\n🛑 Exited by user.")
